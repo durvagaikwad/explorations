@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spring Physics — Motion Exploration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0C0C0A;
+    --surface:  #151513;
+    --surface2: #1C1C19;
+    --border:   rgba(255,255,255,0.07);
+    --border2:  rgba(255,255,255,0.12);
+    --text:     #EEEEE8;
+    --muted:    #6A6A64;
+    --dim:      #333330;
+    --teal:     #1D9E75;
+    --teal-dim: rgba(29,158,117,0.12);
+    --teal-glow:rgba(29,158,117,0.06);
+    --mono:     'JetBrains Mono', 'Courier New', monospace;
+    --serif:    'DM Serif Display', Georgia, serif;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  body {
+    background-image: radial-gradient(rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  .wrap {
+    max-width: 580px;
+    margin: 0 auto;
+    padding: 48px 24px 48px;
+  }
+
+  .header { margin-bottom: 40px; }
+
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .eyebrow::after {
+    content: '';
+    flex: 1;
+    height: 0.5px;
+    background: var(--border);
+  }
+
+  .title {
+    font-family: var(--serif);
+    font-size: 42px;
+    font-weight: 400;
+    line-height: 1.1;
+    color: var(--text);
+    margin-bottom: 10px;
+    letter-spacing: -0.01em;
+  }
+  .title em { font-style: italic; color: var(--teal); }
+
+  .subtitle {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+    max-width: 320px;
+    line-height: 1.7;
+  }
+
+  .demo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .card-label {
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    color: var(--dim);
+    align-self: flex-start;
+  }
+
+  .element-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 44px;
+    flex-shrink: 0;
+  }
+
+  #tt {
+    width: 80px; height: 40px; border-radius: 20px;
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    cursor: pointer; position: relative;
+    user-select: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  #tt.on { background: var(--teal); border-color: #0F6E56; }
+  #tk {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--text);
+    position: absolute; top: 5px; left: 5px;
+    pointer-events: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+
+  #bb {
+    width: 80px; height: 34px;
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    border-radius: 6px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transform-origin: center bottom;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  #bb:hover { border-color: var(--teal); color: var(--teal); }
+
+  #da {
+    width: 80px; height: 40px;
+    border-radius: 6px;
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    position: relative;
+    cursor: grab;
+    overflow: visible;
+    user-select: none;
+  }
+  #da:active { cursor: grabbing; }
+  .da-center {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 0.5px; height: 12px;
+    background: var(--dim);
+  }
+  #db {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--teal);
+    position: absolute; top: 8px; left: 28px;
+    pointer-events: none;
+    box-shadow: 0 0 8px rgba(29,158,117,0.3);
+  }
+
+  .scope {
+    display: block;
+    width: 100%; height: 52px;
+    border-radius: 5px;
+  }
+
+  .controls {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+
+  .ctrl-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .ctrl-name { font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
+  .ctrl-val  { font-size: 13px; color: var(--text); }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%; height: 2px;
+    background: var(--border2); border-radius: 1px;
+    outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--teal); cursor: pointer;
+    box-shadow: 0 0 0 3px rgba(29,158,117,0.15);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--teal); border: none; cursor: pointer;
+  }
+
+  .presets {
+    display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .pbtn {
+    padding: 5px 14px;
+    border: 0.5px solid var(--border2);
+    background: transparent; color: var(--muted);
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em;
+    border-radius: 4px; cursor: pointer;
+    transition: border-color 0.12s, color 0.12s, background 0.12s;
+  }
+  .pbtn:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-glow); }
+  .pbtn.active { border-color: var(--teal); color: var(--teal); background: var(--teal-dim); }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 8px;
+    margin-bottom: 36px;
+  }
+  .metric {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: 8px; padding: 12px 14px;
+  }
+  .metric-label { font-size: 9px; letter-spacing: 0.1em; color: var(--dim); margin-bottom: 5px; }
+  .metric-val   { font-size: 18px; font-weight: 500; color: var(--text); letter-spacing: -0.01em; }
+
+  .footer {
+    border-top: 0.5px solid var(--border);
+    padding-top: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .footer-formula { font-size: 11px; color: var(--dim); font-style: italic; }
+  .footer-meta    { font-size: 10px; color: var(--dim); text-align: right; letter-spacing: 0.03em; line-height: 1.8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="header">
+    <p class="eyebrow">EXPLORATION · MOTION SYSTEMS</p>
+    <h1 class="title">Spring <em>Physics</em></h1>
+    <p class="subtitle">Two parameters — stiffness and damping — define every motion personality in a product. Same engine, three affordances.</p>
+  </header>
+
+  <div class="demo-grid">
+    <div class="card">
+      <span class="card-label">TOGGLE</span>
+      <div class="element-wrap">
+        <div id="tt" onclick="doToggle()"><div id="tk"></div></div>
+      </div>
+      <canvas id="s1" class="scope"></canvas>
+    </div>
+    <div class="card">
+      <span class="card-label">BUTTON</span>
+      <div class="element-wrap">
+        <button id="bb">press</button>
+      </div>
+      <canvas id="s2" class="scope"></canvas>
+    </div>
+    <div class="card">
+      <span class="card-label">DRAG</span>
+      <div class="element-wrap">
+        <div id="da">
+          <div class="da-center"></div>
+          <div id="db"></div>
+        </div>
+      </div>
+      <canvas id="s3" class="scope"></canvas>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div>
+      <div class="ctrl-head">
+        <span class="ctrl-name">STIFFNESS</span>
+        <span id="ko" class="ctrl-val">200</span>
+      </div>
+      <input type="range" id="ksl" min="20" max="600" step="10" value="200" oninput="onSl()">
+    </div>
+    <div>
+      <div class="ctrl-head">
+        <span class="ctrl-name">DAMPING</span>
+        <span id="co" class="ctrl-val">18</span>
+      </div>
+      <input type="range" id="csl" min="2" max="50" step="1" value="18" oninput="onSl()">
+    </div>
+  </div>
+
+  <div class="presets">
+    <button class="pbtn" onclick="pset(400,35,this)">Snappy</button>
+    <button class="pbtn" onclick="pset(250,10,this)">Bouncy</button>
+    <button class="pbtn" onclick="pset(60,4,this)">Wobbly</button>
+    <button class="pbtn active" onclick="pset(120,22,this)">Smooth</button>
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">DAMPING RATIO ζ</div>
+      <div id="mz" class="metric-val">—</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">NAT. FREQUENCY</div>
+      <div id="mf" class="metric-val">—</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">CHARACTER</div>
+      <div id="mfl" class="metric-val">—</div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <span class="footer-formula">a = k(target − pos) − c · vel</span>
+    <div class="footer-meta">No dependencies · Vanilla JS<br>Canvas API · requestAnimationFrame</div>
+  </footer>
+
+</div>
+<script>
+var K=200,C=18,HS=220;
+var s1={pos:0,vel:0,target:0,on:false};
+var s2={pos:1,vel:0,target:1};
+var s3={pos:0,vel:0,target:0,drag:false,dsx:0,dsp:0};
+var BP=0.88,BM=28,T1M=80-30-10;
+var h1=new Array(HS).fill(0);
+var h2=new Array(HS).fill(0);
+var h3=new Array(HS).fill(0.5);
+var c1=document.getElementById('s1'),x1=c1.getContext('2d');
+var c2=document.getElementById('s2'),x2=c2.getContext('2d');
+var c3=document.getElementById('s3'),x3=c3.getContext('2d');
+var tt=document.getElementById('tt'),tk=document.getElementById('tk');
+var bb=document.getElementById('bb');
+var da=document.getElementById('da'),db=document.getElementById('db');
+var cw1=0,ch1=0,cw2=0,ch2=0,cw3=0,ch3=0;
+var rafId=null,pt=null;
+
+function initC(){
+  var dpr=window.devicePixelRatio||1;
+  function setup(cv,xc){
+    var w=cv.offsetWidth,h=cv.offsetHeight||52;
+    cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);
+    xc.setTransform(dpr,0,0,dpr,0,0);
+    return [w,h];
+  }
+  var r=setup(c1,x1);cw1=r[0];ch1=r[1];
+  r=setup(c2,x2);cw2=r[0];ch2=r[1];
+  r=setup(c3,x3);cw3=r[0];ch3=r[1];
+}
+
+function go(){if(rafId)return;pt=performance.now();rafId=requestAnimationFrame(loop);}
+
+function step(sp,dt){
+  var a=K*(sp.target-sp.pos)-C*sp.vel;
+  sp.vel+=a*dt;sp.pos+=sp.vel*dt;
+}
+function done(sp){return Math.abs(sp.vel)<0.0007&&Math.abs(sp.pos-sp.target)<0.0007;}
+
+function loop(now){
+  var dt=Math.min((now-pt)*0.001,0.033);pt=now;
+  step(s1,dt);step(s2,dt);step(s3,dt);
+  tk.style.left=(5+s1.pos*T1M)+'px';
+  bb.style.transform='scale('+s2.pos.toFixed(4)+') translateY('+((1-s2.pos)*14).toFixed(2)+'px)';
+  db.style.left=(28+s3.pos)+'px';
+  h1.push(s1.pos);if(h1.length>HS)h1.shift();
+  h2.push((1-s2.pos)/(1-BP));if(h2.length>HS)h2.shift();
+  h3.push(s3.pos/BM*0.5+0.5);if(h3.length>HS)h3.shift();
+  dsc(x1,cw1,ch1,h1);dsc(x2,cw2,ch2,h2);dsc(x3,cw3,ch3,h3);
+  if(done(s1)&&done(s2)&&(done(s3)&&!s3.drag)){rafId=null;return;}
+  rafId=requestAnimationFrame(loop);
+}
+
+function dsc(ctx,W,H,hist){
+  if(!W)return;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0C0C0A';ctx.fillRect(0,0,W,H);
+  var y0=H*.82,y1=H*.15;
+  ctx.setLineDash([2,6]);ctx.lineWidth=0.5;
+  ctx.strokeStyle='rgba(255,255,255,0.05)';
+  ctx.beginPath();ctx.moveTo(0,y0);ctx.lineTo(W,y0);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,y1);ctx.lineTo(W,y1);ctx.stroke();
+  ctx.setLineDash([]);
+  if(hist.length<2)return;
+  ctx.beginPath();
+  for(var i=0;i<hist.length;i++){
+    var x=(i/(HS-1))*W,y=y0-hist[i]*(y0-y1);
+    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  }
+  ctx.lineTo(W,y0);ctx.lineTo(0,y0);ctx.closePath();
+  ctx.fillStyle='rgba(29,158,117,0.1)';ctx.fill();
+  ctx.beginPath();
+  for(var i=0;i<hist.length;i++){
+    var x=(i/(HS-1))*W,y=y0-hist[i]*(y0-y1);
+    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  }
+  ctx.strokeStyle='#1D9E75';ctx.lineWidth=1.5;ctx.lineJoin='round';ctx.stroke();
+}
+
+function doToggle(){
+  s1.on=!s1.on;s1.target=s1.on?1:0;
+  tt.classList.toggle('on',s1.on);go();
+}
+
+bb.addEventListener('mousedown',function(e){e.preventDefault();s2.target=BP;go();});
+bb.addEventListener('mouseup',function(){s2.target=1;go();});
+bb.addEventListener('mouseleave',function(){s2.target=1;go();});
+bb.addEventListener('touchstart',function(e){e.preventDefault();s2.target=BP;go();},{passive:false});
+bb.addEventListener('touchend',function(){s2.target=1;go();});
+
+da.addEventListener('mousedown',function(e){
+  e.preventDefault();s3.drag=true;s3.dsx=e.clientX;s3.dsp=s3.pos;go();
+});
+da.addEventListener('touchstart',function(e){
+  e.preventDefault();s3.drag=true;s3.dsx=e.touches[0].clientX;s3.dsp=s3.pos;go();
+},{passive:false});
+document.addEventListener('mousemove',function(e){
+  if(!s3.drag)return;
+  s3.target=Math.max(-BM,Math.min(BM,s3.dsp+(e.clientX-s3.dsx)));go();
+});
+document.addEventListener('touchmove',function(e){
+  if(!s3.drag)return;
+  s3.target=Math.max(-BM,Math.min(BM,s3.dsp+(e.touches[0].clientX-s3.dsx)));go();
+});
+function endDrag(){if(!s3.drag)return;s3.drag=false;s3.target=0;go();}
+document.addEventListener('mouseup',endDrag);
+document.addEventListener('touchend',endDrag);
+
+function onSl(){
+  K=+document.getElementById('ksl').value;C=+document.getElementById('csl').value;
+  document.getElementById('ko').textContent=K;document.getElementById('co').textContent=C;
+  metrics();
+}
+function pset(nk,nc,el){
+  K=nk;C=nc;
+  document.getElementById('ksl').value=K;document.getElementById('csl').value=C;
+  document.getElementById('ko').textContent=K;document.getElementById('co').textContent=C;
+  document.querySelectorAll('.pbtn').forEach(function(b){b.classList.remove('active');});
+  if(el)el.classList.add('active');
+  metrics();
+}
+function metrics(){
+  var z=C/(2*Math.sqrt(K)),f=Math.sqrt(K)/(2*Math.PI);
+  document.getElementById('mz').textContent=z.toFixed(2);
+  document.getElementById('mf').textContent=f.toFixed(1)+' Hz';
+  document.getElementById('mfl').textContent=z<0.3?'wobbly':z<0.7?'bouncy':z<1.1?'snappy':'smooth';
+}
+setTimeout(function(){initC();dsc(x1,cw1,ch1,h1);dsc(x2,cw2,ch2,h2);dsc(x3,cw3,ch3,h3);metrics();},80);
+window.addEventListener('resize',function(){initC();});
+</script>
+</body>
+</html>

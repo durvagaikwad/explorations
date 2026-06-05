@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Translucent Cubes Void</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;font-family:system-ui,sans-serif;overflow:hidden;}
+  #root{width:100vw;height:100vh;position:relative;}
+  #hint{position:absolute;bottom:16px;left:16px;color:#666;font-size:12px;letter-spacing:0.05em;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="root"><div id="hint">move mouse to look · scroll to move up/down · pinch to zoom</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  const root = document.getElementById('root');
+  let W = window.innerWidth, H = window.innerHeight;
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x000000, 50, 260);
+
+  const camera = new THREE.PerspectiveCamera(65, W/H, 0.1, 600);
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(W, H);
+  renderer.setClearColor(0x000000, 1);
+  root.appendChild(renderer.domElement);
+
+  // soft lighting so cube faces shade differently
+  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+  const key = new THREE.DirectionalLight(0xffffff, 0.8);
+  key.position.set(5, 10, 7);
+  scene.add(key);
+
+  // ---- faint 3D wireframe grid (background) ----
+  const gridGroup = new THREE.Group();
+  const gSize = 100, gStep = 5;
+  const gMat = new THREE.LineBasicMaterial({color:0xffffff, transparent:true, opacity:0.22});
+  function gLine(a, b){
+    const g = new THREE.BufferGeometry().setFromPoints([a, b]);
+    gridGroup.add(new THREE.Line(g, gMat));
+  }
+  for(let i=-gSize; i<=gSize; i+=gStep){
+    gLine(new THREE.Vector3(-gSize,0,i), new THREE.Vector3(gSize,0,i));
+    gLine(new THREE.Vector3(-gSize,i,0), new THREE.Vector3(gSize,i,0));
+    gLine(new THREE.Vector3(i,-gSize,0), new THREE.Vector3(i,gSize,0));
+    gLine(new THREE.Vector3(0,-gSize,i), new THREE.Vector3(0,gSize,i));
+    gLine(new THREE.Vector3(i,0,-gSize), new THREE.Vector3(i,0,gSize));
+    gLine(new THREE.Vector3(0,i,-gSize), new THREE.Vector3(0,i,gSize));
+  }
+  scene.add(gridGroup);
+
+  // ---- a bunch of translucent cubes at varied sizes ----
+  const N = 80;
+  const baseGeo = new THREE.BoxGeometry(1,1,1);
+  const edgeGeo = new THREE.EdgesGeometry(baseGeo);
+
+  function rand(a,b){ return a + Math.random()*(b-a); }
+
+  for(let i=0; i<N; i++){
+    const size = Math.pow(Math.random(), 1.6) * 9 + 1.2;   // mostly small, occasional large
+    const color = 0xffffff;
+    const mat = new THREE.MeshLambertMaterial({
+      color, transparent:true, opacity: rand(0.25, 0.55), depthWrite:false
+    });
+    const mesh = new THREE.Mesh(baseGeo, mat);
+    mesh.scale.setScalar(size);
+    mesh.position.set(rand(-50,50), rand(-35,35), rand(-50,50));
+    scene.add(mesh);
+
+    // subtle edge outline
+    const edges = new THREE.LineSegments(
+      edgeGeo,
+      new THREE.LineBasicMaterial({color, transparent:true, opacity:0.5})
+    );
+    edges.scale.copy(mesh.scale);
+    edges.position.copy(mesh.position);
+    scene.add(edges);
+  }
+
+  // stars
+  const starGeo = new THREE.BufferGeometry();
+  const pts = [];
+  for(let i=0;i<600;i++){
+    pts.push((Math.random()-0.5)*240,(Math.random()-0.5)*240,(Math.random()-0.5)*240);
+  }
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts,3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({color:0xffffff,size:0.25})));
+
+  // ---- camera control: first-person look + scroll fly + pinch zoom ----
+  camera.position.set(0, 0, 0);
+  let mx = 0, my = 0, cmx = 0, cmy = 0;
+  let scrollDelta = 0;
+  let fov = 65, targetFov = 65;
+  let lastInput = performance.now();
+  const yawRange = Math.PI * 0.95;
+  const pitchRange = Math.PI * 0.4;
+  const lookDir = new THREE.Vector3();
+
+  function bumpInput(){ lastInput = performance.now(); }
+
+  window.addEventListener('mousemove', e=>{
+    mx = (e.clientX / W) * 2 - 1;
+    my = (e.clientY / H) * 2 - 1;
+    bumpInput();
+  });
+
+  // wheel event: ctrlKey=true means a trackpad pinch (browsers expose it this way),
+  // anything else is regular scroll → fly forward/back along view direction.
+  window.addEventListener('wheel', e=>{
+    if(e.ctrlKey){
+      targetFov = Math.max(15, Math.min(120, targetFov + e.deltaY * 0.4));
+    } else {
+      scrollDelta += e.deltaY * 0.05;
+    }
+    bumpInput();
+    e.preventDefault();
+  }, {passive:false});
+
+  window.addEventListener('resize', ()=>{
+    W = window.innerWidth; H = window.innerHeight;
+    camera.aspect = W / H;
+    camera.updateProjectionMatrix();
+    renderer.setSize(W, H);
+  });
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const now = performance.now();
+    const idleTime = (now - lastInput) / 1000;
+    // after 2s idle, blend mouse target toward a slow sinusoidal drift
+    let tmx = mx, tmy = my;
+    if(idleTime > 2){
+      const t = now * 0.0002;
+      const blend = Math.min(1, (idleTime - 2) / 3);
+      const driftX = Math.sin(t) * 0.5;
+      const driftY = Math.sin(t * 0.7) * 0.2;
+      tmx = mx * (1 - blend) + driftX * blend;
+      tmy = my * (1 - blend) + driftY * blend;
+    }
+    cmx += (tmx - cmx) * 0.06;
+    cmy += (tmy - cmy) * 0.06;
+    const yaw = cmx * yawRange;
+    const pitch = -cmy * pitchRange;
+    lookDir.set(
+      Math.sin(yaw) * Math.cos(pitch),
+      Math.sin(pitch),
+      -Math.cos(yaw) * Math.cos(pitch)
+    );
+    if(scrollDelta !== 0){
+      camera.position.y += scrollDelta;
+      scrollDelta = 0;
+    }
+    fov += (targetFov - fov) * 0.15;
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+    // grid follows camera, snapped to step so lines appear stationary → feels infinite
+    gridGroup.position.x = Math.round(camera.position.x / gStep) * gStep;
+    gridGroup.position.y = Math.round(camera.position.y / gStep) * gStep;
+    gridGroup.position.z = Math.round(camera.position.z / gStep) * gStep;
+    camera.lookAt(camera.position.clone().add(lookDir));
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+</script>
+</body>
+</html>
